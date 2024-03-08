@@ -1,0 +1,424 @@
+---
+title: "Young Consumer Perceptions And Willingness To Pay For Organic Rice : A Cases Study In Kochi"
+subtitle: "Thanakorn Charoensuk"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    self-contained: true
+    fontsize: 1.1em
+    linestretch: 1.5
+    toc: true
+    toc-location: left
+    number-sections: true
+    code-fold: true
+    theme:
+      light: cosmo
+      dark: darkly
+execute:
+  message: false
+  warning: false
+  fig-align: center
+editor: visual
+---
+
+# Library
+
+------------------------------------------------------------------------
+
+```{r include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, comment = "")
+```
+
+```{r lib}
+setwd("~/Desktop/New Folder With Items/Research")
+library(tidyverse)
+library(haven)
+library(readxl)
+library(mice)
+library(sjPlot)
+library(janitor)
+library(VIM)
+library(reshape2)
+library(patchwork)
+library(gtsummary)
+library(ggplot2)
+library(patchwork)
+
+```
+
+```{r}
+df <- read_excel("organic_respons_96785.xlsx")
+```
+
+```{r}
+WTP <- df %>% 
+  rename("health" = "What  factors influence your willingness to pay?_ Recognized Health Benefits",
+         "environment" = "What  factors influence your willingness to pay?_ Perceived environmental benefits",
+         "taste" = "What  factors influence your willingness to pay?_ Better taste",
+         "trust"= "What  factors influence your willingness to pay?_ Trust in organic certification", 
+         "WTP" = "Are you willing to pay more for organic rice",
+         "rate_price" = "How would you rate the price of organic rice compared to conventional rice?",
+         "How_much_WTP" = "how much more are you willing to pay",
+         "encourage_lowerprice" = "What could encourage you to buy more organic rice?_ Lower price",
+         "encourage_availability" = "What could encourage you to buy more organic rice?_ More availability in my regular grocery store",
+         "encourage_information" = "What could encourage you to buy more organic rice?_ More information about the benefits", 
+         "encourage_taste" = "What could encourage you to buy more organic rice?_ Better taste",
+         "rate_taste" = "How would you rate the taste of organic rice compared to conventional rice?", 
+         "rate_overall" = "Overall, how would you rate organic rice compared to conventional rice?", 
+         "rate_environment" = "How would you rate the environmental impact of organic rice production compared to conventional rice production?", 
+         "rate_safety" = "would you rate the safety (in terms of pesticide residues and other harmful substances)", 
+         "reason_price" = "What are the main reasons you do not buy organic rice?_ Higher price", 
+         "reason_available" = "What are the main reasons you do not buy organic rice?_ available in my regular grocery store", 
+         "reason_don'tsee_benefit" = "What are the main reasons you do not buy organic rice?_ I don't see the benefits", 
+         "reason_taste" = "What are the main reasons you do not buy organic rice?_ I don't like the taste",
+         "rate_nutritional" = "How would you rate the nutritional value of organic rice compared to conventional rice?", "income" = "Montly income",
+         "heard_organic" = "Have you heard of organic rice?",
+         "think_benefit" = "What do you think are the benefits of organic rice?",
+         "choice" = "If you had the choice between organic rice and regular rice, which would you choose?", 
+         "consumed_organic" = "Have you ever consumed organic rice?",
+         "aware_certification" ="\r\nAre you aware of the certification process for organic rice?",
+         "what_improve_certification" = "What could improve your trust in the certification",
+         "know_different" = "x",
+         "benefit_health" = "What do you think are the benefits of organic rice?_good for health",
+         "benefit_environment" = "What do you think are the benefits of organic rice?_environmentally friendly",
+         "benefit_taste" = "What do you think are the benefits of organic rice?_Better taste") %>% 
+  
+  mutate(WTP =  case_when(WTP == "Yes" ~ "1",
+                          WTP == "No" ~ "0",
+                          TRUE ~ WTP)) %>% 
+  mutate(WTP = as.numeric(WTP)) %>% 
+  mutate(How_much_WTP = case_when(How_much_WTP == "10 Less than 10% more" ~ "1", 
+                                   How_much_WTP == "1020% 10-20% more" ~ "2", 
+                                   How_much_WTP == "2030% 20-30% more" ~ "3",
+                                   How_much_WTP == "3040% 30-40% more" ~ "4", 
+                                   TRUE ~ How_much_WTP)) %>% 
+  mutate(How_much_WTP = as.numeric(How_much_WTP)) %>% 
+  clean_names() %>% 
+  rename(
+         "reason_notbuy" = "what_are_the_main_reasons_you_do_not_buy_organic_rice",
+         "factors_influence" = "what_factors_influence_your_willingness_to_pay",
+         "howmuch_trust_certificate" = "how_much_do_you_trust_the_certification")
+```
+
+# Data imputations
+
+```{r}
+WTP %>% select(which(colMeans(is.na(.))<0.5)) %>% select_if(is.numeric)
+aggr(WTP)
+
+df_imputed <- mice(data = WTP %>% dplyr::select(which(colMeans(is.na(.))<0.5)) %>% select_if(is.numeric),
+     method = "pmm") %>% 
+  complete()
+
+```
+
+```{r}
+WTPimputed_1 <- WTP %>% dplyr::select(-colnames(df_imputed)) %>% 
+  bind_cols(df_imputed)
+WTPimputed_1 %>% glimpse()
+```
+
+# Data recoding
+
+```{r}
+
+WTP_final <- WTPimputed_1 %>% 
+  mutate(age_group = case_when(age_group == "Below 20" ~ "1",
+                               age_group == "20 Below 20" ~ "1",
+                               age_group == "20-29" ~ "2")) %>% 
+  
+  mutate(gender = case_when(gender == "Female" ~ "0",
+                            gender == "Male" ~ "1",
+                            gender == "Prefer not to say" ~ "2")) %>%
+  
+  mutate(education = case_when(education == "High school or less" ~ "1",
+                               education == "Some college or university" ~ "2",
+                               education == "Doctorate or professional degree" ~ "3")) %>%
+  
+  mutate(income = case_when(income == "100,000 - 200,000" ~ "1",
+                            income == "100,000 below" ~ "0",
+                            income == "200,000 - 300,000" ~ "2",
+                            income == "500,000 more than" ~ "3")) %>%
+  
+  mutate(choice = case_when(choice == "organic rice" ~ "1",
+                                      choice == "common rice" ~ "2",
+                                      choice == "no particular preference" ~ "3"))
+  
+```
+
+# heat map rating organic rice
+
+```{r}
+
+rating_group <- WTP_final %>%
+  select(rating. _price, rate_taste, rate_nutritional, rate_environment, rate_overall, rate_safety) %>%
+  pivot_longer(cols = 1:6, names_to = "items", values_to = "response") %>%
+  count(items, response) %>%
+  group_by(items) %>%
+  mutate(prop_response = n / sum(n) * 100) %>%
+  ungroup() %>%
+  mutate(response2 = factor(response, levels = 1:7) %>% fct_rev()) %>%
+  mutate(items = str_remove(items, "rate_|rating_")) %>%
+  mutate(items = str_to_title(items))
+  
+  
+```
+
+## Visualise Perceptions
+
+```{r}
+plot_rating <- 
+rating_group %>%
+   ggplot(aes(x = prop_response, y = items, fill = response2)) +
+     geom_col(size = 1, width = 0.6) +
+     geom_text(
+               aes(label = round(prop_response, 0), x = prop_response, y = items),
+               position = position_stack(vjust = 0.5),
+               color = "#ffffff") +
+     scale_fill_manual(values = c("#1c3e35", "#315c4f", "#467a69", "#5b9883", 
+                                  "#6fb69d", "#84d4b7", "#99f2d1"),
+                       labels = c("Strongly agree", "6", "5", "4", "3", "2", "Strongly Disagree")) +
+     guides(fill = guide_legend(nrow = 1,
+                                label.position = "top",
+                                reverse = TRUE)) +
+     theme_minimal() +
+     theme(plot.margin = margin(rep(20, 4)),
+           panel.grid = element_blank(),
+           axis.title.y = element_blank(),
+           axis.title.x = element_text(margin = margin(t=10), size = 14),
+           axis.text = element_text(size = 12, color = "grey20"),
+           legend.position = "top",
+           legend.text = element_text(size = 12)) +
+     labs(fill = element_blank(),
+          x = "N = 107",
+          caption = "Rating of organic rice vs conventional rice")
+  
+ggsave("plot organic rice/Ratting_organic_rice.jpeg",
+       units = "in",
+       width = 10,
+       height = 4.8)
+
+plot_rating
+```
+
+#correlation percived benefit
+
+```{r}
+cordata1 <- WTP_final %>% select(health:trust, wtp)
+corspearman1 <- round(cor(cordata1, method = "spearman"), 3)
+corspearman1[lower.tri(corspearman1)] <- NA
+melted_corspearman1 <- melt(corspearman1) %>% mutate(value = round(value, 2))
+
+
+correlation_fianl1 <- melted_corspearman1 %>% 
+  mutate(Var2 = fct_rev(Var2),
+         Var1 = factor(Var1)) %>% 
+  na.omit() %>%
+  ggplot(aes(x = Var2, y = Var1, fill = value)) + 
+  geom_tile() +
+  geom_text(aes(label = value)) + 
+  scale_fill_gradient(low = "#86bbd8", high = "#33658a", breaks=c(-0.5, 0.0, 0.5, 1.0), limit = c(-0.5, 1)) +
+  theme_blank() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 16),
+        plot.title = element_text(size = 19, face = "bold")) +
+  labs(x = element_blank(),
+       y = element_blank(),
+       title = str_wrap("what factors influence your willingness to pay for organic rice?", 40),
+       fill = "correlation") 
+```
+
+```{r}
+cordata2 <- WTP_final %>% select(benefit_health:benefit_taste, wtp) %>% 
+  rename("good for health" = benefit_health,
+         "environmentally" = benefit_environment,
+         "better taste" = benefit_taste)
+  
+  
+corspearman2 <- round(cor(cordata2, method = "spearman"), 3)
+corspearman2[lower.tri(corspearman2)] <- NA
+melted_corspearman2 <- melt(corspearman2) %>% mutate(value = round(value, 2))
+
+
+correlation_fianl2 <- melted_corspearman2 %>% 
+  na.omit() %>% 
+  mutate(Var2 = fct_rev(Var2),
+         Var1 = factor(Var1)) %>% 
+  ggplot(aes(x = Var2, y = Var1, fill = value)) + 
+  geom_tile() +
+  geom_text(aes(label = value)) + 
+  scale_fill_gradient(low = "#86bbd8", high = "#33658a") +
+  theme_blank() +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 16),
+        plot.title = element_text(size = 19, face = "bold")) +
+  labs(x = element_blank(),
+       y = element_blank(), 
+       title = str_wrap("what do you think are the benefit of organic rice?", 40),
+       fill = "correlation") 
+```
+
+```{r}
+(correlation_fianl1 / correlation_fianl2) & theme(legend.position = "bottom") 
+
+ggsave("plot organic rice/correlation_heatmap.jpeg",
+       width = 10,
+       height = 11,
+       dpi = 400)
+```
+
+#Descriptive statistic
+
+```{r}
+# Load the gtsummary package
+library(gtsummary)
+
+# Your data manipulation and summary code
+WTP_final %>% 
+  select(gender, wtp, how_much_wtp, heard_organic, choice, know_different) %>% 
+  mutate(gender = case_when(gender == "0" ~ "Female",
+                            gender == "1" ~ "Male", 
+                            gender == "2" ~ "Prefer not to say")) %>%
+  mutate(wtp = case_when(wtp == 0 ~ "No",
+                         wtp == 1 ~ "Yes")) %>%
+  mutate(how_much_wtp = case_when(how_much_wtp == "1" ~ "less than 10%",
+                                  how_much_wtp == "2" ~ "10-20%",
+                                  how_much_wtp == "3" ~ "20-30%",
+                                  how_much_wtp == "4" ~ "30-40%")) %>%
+  mutate(choice = case_when(choice == "1" ~ "organic rice",
+                            choice == "2" ~ "common rice",
+                            choice == "3" ~ "no particular preference")) %>%
+  
+  tbl_summary(type = list(wtp ~ "categorical", heard_organic ~ "categorical", know_different ~ "categorical"))
+
+```
+
+
+#Logistic Regression Plotting
+
+##logit
+
+```{r}
+Logit_fixincome <- WTP_final %>% 
+  filter(!gender == "2") %>% 
+  mutate(income = if_else(income == "0", income, "1"))
+```
+
+```{r}
+Logit <- glm(data = Logit_fixincome,
+    formula = "wtp ~ health + environment + taste + trust",
+    family = binomial(link = "logit"))
+
+Logit_socio <- glm(data = Logit_fixincome,
+                   formula = "wtp ~ age_group + gender + income",
+                   family = binomial(link = "logit"))
+
+Logit_combine <- glm(data = Logit_fixincome, 
+    formula = "wtp ~ health + environment + taste + trust + age_group + gender + income",
+    family = binomial(link = "logit"))
+
+
+Logit_interact <- glm(data = WTP, 
+    formula = "wtp ~ health + environment + taste + trust + health * rate_price", 
+    family = binomial(link = "logit"))
+
+library(effects)
+interaction_plot <- effect("health*rate_price", Logit_interact)
+
+jpeg("plot organic rice/logistic_regression.jpeg",
+     width = 900, height = 600)
+dev.off()
+
+```
+
+```{r}
+knitr::include_graphics("plot organic rice/logistic_regression.jpeg")
+```
+
+## Logistic table
+
+## Logistic table with socio-demographic
+
+```{r}
+sjPlot::tab_model(Logit_socio, Logit)
+```
+
+# Consumption of organic rice
+
+## Reason not to buy organic rice
+
+```{r}
+reason1 <- WTP_final %>% 
+  select(reason_price, reason_available, reason_taste, reason_dontsee_benefit) %>%
+  pivot_longer(cols = reason_price:reason_dontsee_benefit, names_to = "reason") %>%
+  group_by(reason) %>% 
+  summarise(count = sum(value)) %>%
+  mutate(reason = fct_reorder(reason, -count)) %>%  # Reorder based on the negative count
+  ggplot(aes(x = count, y = reason)) + 
+  geom_col(fill = "#0d3b66", width = 0.60) +  # Muted blue tone for academic feel
+  theme_minimal() +
+  theme(axis.text = element_text(size = 16), 
+        plot.title = element_text(face = "bold", size = 17.3)) +
+  labs(title = "What are the main reasons you do not buy organic rice",
+       x = element_blank(),
+       y = element_blank())
+```
+
+## Encourage to buying organic rice
+
+```{r}
+reason2 <- WTP_final %>% 
+  select(starts_with("encourage_")) %>%
+  pivot_longer(cols = everything(), names_to = "reason") %>%
+  group_by(reason) %>% 
+  summarise(count = sum(value)) %>%
+  mutate(reason = fct_reorder(reason, -count)) %>%
+  ggplot(aes(x = count, y = reason)) + 
+  geom_col(fill = "#0d3b66", width = 0.60) +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 15),
+        plot.title = element_text(face = "bold", size = 17.3,
+                                  margin = margin(t = 10))) +
+  labs(title = "what could encourage you to buy more organic rice",
+       x = element_blank(),
+       y = element_blank())
+
+```
+
+## Combline reason organice bar chart
+
+```{r}
+# Combine the two plots
+combined_plot <- (reason1 / reason2) & theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("plot organic rice/reason_tobuy_and_notbuy.jpeg",
+       plot = combined_plot,
+       width = 10,  
+       height = 9.5,   
+       dpi = 400)
+```
+
+# Mean of Rate organic rice
+
+```{r}
+# Calculate mean for columns starting with 'rate'
+rate_means <- WTP_final %>%
+  select(rate_taste:rate_overall) %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+
+# Round the means to two decimal places
+rate_means_rounded <- rate_means %>% mutate(across(everything(), round, 2))
+
+# Print the rounded means
+print(rate_means_rounded)
+```
+
+#EXPERIMENTAL!!!
+
+```{r}
+library()
+
+
+```
+
+
